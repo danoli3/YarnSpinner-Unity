@@ -207,6 +207,20 @@ namespace Yarn.Unity.Editor
         /// to use Unity Localization.</remarks>
         public bool useAddressableAssets;
 
+        /// <summary>The GUID of the <see cref="StringTableCodec"/> used to encode this project's program and line text (empty for none).</summary>
+        public string? stringTableCodecGUID;
+
+        /// <summary>Gets the <see cref="StringTableCodec"/> referenced by <see cref="stringTableCodecGUID"/>, if any.</summary>
+        internal StringTableCodec? CodecAsset
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(stringTableCodecGUID)) { return null; }
+                var path = AssetDatabase.GUIDToAssetPath(stringTableCodecGUID);
+                return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<StringTableCodec>(path);
+            }
+        }
+
         internal static string UnityProjectRootPath => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
         // Scripted importers can't have direct references to scriptable
@@ -369,6 +383,20 @@ namespace Yarn.Unity.Editor
             // bytecode, so that other assets don't lose their references.
             ctx.AddObjectToAsset("Project", projectAsset);
             ctx.SetMainObject(projectAsset);
+
+            var codec = CodecAsset;
+            if (!string.IsNullOrEmpty(stringTableCodecGUID))
+            {
+                if (codec == null)
+                {
+                    Debug.LogWarning($"{projectAsset.name}: the string table codec asset ({stringTableCodecGUID}) couldn't be loaded; content will not be encoded.");
+                }
+                else
+                {
+                    ctx.DependsOnSourceAsset(AssetDatabase.GUIDToAssetPath(stringTableCodecGUID));
+                }
+            }
+            projectAsset.programCodec = codec;
 
             var importData = ScriptableObject.CreateInstance<ProjectImportData>();
             importData.name = "Project Import Data";
@@ -684,7 +712,9 @@ namespace Yarn.Unity.Editor
                     compiledBytes = memoryStream.ToArray();
                 }
 
-                projectAsset.compiledYarnProgram = compiledBytes;
+                projectAsset.compiledYarnProgram = codec != null
+                    ? codec.Encode(StringTableCodec.ProgramContext, compiledBytes)
+                    : compiledBytes;
 
                 if (generateVariablesSourceFile)
                 {
@@ -1134,6 +1164,7 @@ namespace Yarn.Unity.Editor
                 }
 
                 var newLocalization = ScriptableObject.CreateInstance<Localization>();
+                newLocalization.stringTableCodec = projectAsset.programCodec;
 
                 if (stringTable != null)
                 {
@@ -1247,6 +1278,7 @@ namespace Yarn.Unity.Editor
 
                 var developmentLocalization = ScriptableObject.CreateInstance<Localization>();
                 developmentLocalization.name = $"Default ({importData.baseLanguageName})";
+                developmentLocalization.stringTableCodec = projectAsset.programCodec;
 
 
                 // Add these new lines to the development localisation's asset
