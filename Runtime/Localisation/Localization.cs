@@ -41,6 +41,10 @@ namespace Yarn.Unity
         public sealed class LocalizationTableEntry
         {
             public string? localizedString;
+
+            /// <summary>The line's text encoded by the string table codec; when set, <see cref="localizedString"/> is null.</summary>
+            public byte[]? encryptedString;
+
             public UnityEngine.Object? localizedAsset;
 
 #if USE_ADDRESSABLES
@@ -49,6 +53,9 @@ namespace Yarn.Unity
         }
 
         [SerializeField] internal SerializableDictionary<string, LocalizationTableEntry> entries = new();
+
+        /// <summary>If set, line text is stored encoded with this codec and decoded per line by <see cref="GetLocalizedString"/>.</summary>
+        [SerializeField] internal StringTableCodec? stringTableCodec;
 
         private Dictionary<string, string> _runtimeStringTable = new Dictionary<string, string>();
 
@@ -82,6 +89,23 @@ namespace Yarn.Unity
 
             if (entries.TryGetValue(key, out var entry))
             {
+                if (entry.encryptedString != null)
+                {
+                    if (stringTableCodec == null)
+                    {
+                        Debug.LogError($"Localization '{name}' has encoded text for '{key}' but no {nameof(StringTableCodec)}.");
+                        return null;
+                    }
+                    try
+                    {
+                        return stringTableCodec.DecodeString(key, entry.encryptedString);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError($"Failed to decode text for '{key}' in localization '{name}': {e.Message}");
+                        return null;
+                    }
+                }
                 return entry.localizedString;
             }
 
@@ -113,7 +137,17 @@ namespace Yarn.Unity
         /// language specified by <see cref="LocaleCode"/>.</param>
         internal void AddLocalisedStringToAsset(string key, string value)
         {
-            GetOrCreateEntry(key).localizedString = value;
+            var entry = GetOrCreateEntry(key);
+            if (stringTableCodec != null)
+            {
+                entry.encryptedString = stringTableCodec.EncodeString(key, value);
+                entry.localizedString = null;
+            }
+            else
+            {
+                entry.encryptedString = null;
+                entry.localizedString = value;
+            }
         }
 #endif
 

@@ -380,7 +380,7 @@ namespace Yarn.Unity.Editor
 
             foreach (var (id, entry) in project.baseLocalization.entries)
             {
-                var localizedString = entry.localizedString;
+                var localizedString = project.baseLocalization.GetLocalizedString(id);
                 if (localizedString != null)
                 {
                     target.AddLocalisedStringToAsset(id, localizedString);
