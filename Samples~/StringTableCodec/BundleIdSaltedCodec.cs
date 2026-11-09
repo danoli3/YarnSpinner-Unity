@@ -34,7 +34,12 @@ public class BundleIdSaltedCodec : AesHmacStringTableCodec
         }
 
         var salt = fixedSalt ?? string.Empty;
-        if (includeBundleId) { salt += "|" + Application.identifier; }
+        if (includeBundleId)
+        {
+            var id = Application.identifier;
+            if (string.IsNullOrEmpty(id)) { throw new InvalidOperationException("Application.identifier is EMPTY in this process, so the bundle ID can't be used as a salt here. Turn off Include Bundle Id."); }
+            salt += "|" + id;
+        }
         if (string.IsNullOrEmpty(fixedSalt))
         {
             throw new InvalidOperationException("Fixed Salt is empty: set one on the codec asset (use the Inspector Reset menu to generate a random one).");
