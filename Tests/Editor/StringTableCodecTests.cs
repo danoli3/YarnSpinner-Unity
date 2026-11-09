@@ -123,6 +123,20 @@ namespace Yarn.Unity.Tests
         }
 
         [Test]
+        public void Localization_PlainEntryWithEmptyEncryptedArray_ReturnsPlainText()
+        {
+            // Unity deserializes a null byte[] as an empty array; that must not be treated as encoded data.
+            var loc = ScriptableObject.CreateInstance<Localization>();
+            try
+            {
+                loc.AddLocalisedStringToAsset("line:1", "Plain");
+                loc.entries["line:1"].encryptedString = new byte[0];
+                Assert.AreEqual("Plain", loc.GetLocalizedString("line:1"));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(loc); }
+        }
+
+        [Test]
         public void Localization_WithoutCodec_StoresPlainText()
         {
             var loc = ScriptableObject.CreateInstance<Localization>();

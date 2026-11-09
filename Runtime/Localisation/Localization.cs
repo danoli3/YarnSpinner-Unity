@@ -89,7 +89,8 @@ namespace Yarn.Unity
 
             if (entries.TryGetValue(key, out var entry))
             {
-                if (entry.encryptedString != null)
+                // Unity deserializes a null byte[] as an empty array, so treat empty as "not encoded".
+                if (entry.encryptedString != null && entry.encryptedString.Length > 0)
                 {
                     if (stringTableCodec == null)
                     {
