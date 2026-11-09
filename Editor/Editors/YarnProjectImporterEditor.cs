@@ -45,6 +45,7 @@ namespace Yarn.Unity.Editor
         internal const string UpdateExistingStringsFilesButtonLabel = "Update Existing Strings Files";
 
         private SerializedProperty? useAddressableAssetsProperty;
+        private SerializedProperty? stringTableCodecGUIDProperty;
 
 
         public VisualTreeAsset? editorUI;
@@ -99,6 +100,7 @@ namespace Yarn.Unity.Editor
             base.OnEnable();
 
             useAddressableAssetsProperty = serializedObject.FindProperty(nameof(YarnProjectImporter.useAddressableAssets));
+            stringTableCodecGUIDProperty = serializedObject.FindProperty(nameof(YarnProjectImporter.stringTableCodecGUID));
 
 #if USE_UNITY_LOCALIZATION
             useUnityLocalisationSystemProperty = serializedObject.FindProperty(nameof(YarnProjectImporter.UseUnityLocalisationSystem));
@@ -691,6 +693,22 @@ namespace Yarn.Unity.Editor
             variableStorageSettingsContainer.Add(variablesClassParentDropdownField);
 
             ui.Add(variableStorageSettingsContainer);
+
+            // The codec is stored on the importer as a GUID, like the string table collection.
+            var codecField = new ObjectField("String Table Codec")
+            {
+                objectType = typeof(StringTableCodec),
+                tooltip = "If set, this project's compiled program and line text are stored encoded with this codec. This makes it harder to extract dialogue from built games, but can't stop someone who hooks the running game."
+            };
+            codecField.SetValueWithoutNotify(yarnProjectImporter.CodecAsset);
+            codecField.RegisterValueChangedCallback(e =>
+            {
+                if (stringTableCodecGUIDProperty == null) { return; }
+                var path = e.newValue != null ? AssetDatabase.GetAssetPath(e.newValue) : string.Empty;
+                stringTableCodecGUIDProperty.stringValue = string.IsNullOrEmpty(path) ? string.Empty : AssetDatabase.AssetPathToGUID(path);
+                serializedObject.ApplyModifiedProperties();
+            });
+            ui.Add(codecField);
 
 
             ui.Add(new IMGUIContainer(ApplyRevertGUI));
