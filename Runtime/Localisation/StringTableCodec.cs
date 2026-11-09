@@ -39,6 +39,9 @@ namespace Yarn.Unity
         /// <inheritdoc/>
         public abstract byte[] Decode(string context, byte[] encoded);
 
+        /// <summary>Combines an optional per-project salt with a context, so keys differ between projects; an empty salt returns the context unchanged.</summary>
+        public static string MakeContext(string? salt, string context) => string.IsNullOrEmpty(salt) ? context : salt + "|" + context;
+
         internal byte[] EncodeString(string context, string text) => Encode(context, Encoding.UTF8.GetBytes(text));
 
         internal string DecodeString(string context, byte[] encoded) => Encoding.UTF8.GetString(Decode(context, encoded));

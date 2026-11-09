@@ -57,6 +57,9 @@ namespace Yarn.Unity
         /// <summary>If set, line text is stored encoded with this codec and decoded per line by <see cref="GetLocalizedString"/>.</summary>
         [SerializeField] internal StringTableCodec? stringTableCodec;
 
+        /// <summary>An optional, non-secret salt mixed into each line's codec context.</summary>
+        [SerializeField] internal string? codecSalt;
+
         private Dictionary<string, string> _runtimeStringTable = new Dictionary<string, string>();
 
         /// <summary>
@@ -99,11 +102,11 @@ namespace Yarn.Unity
                     }
                     try
                     {
-                        return stringTableCodec.DecodeString(key, entry.encryptedString);
+                        return stringTableCodec.DecodeString(StringTableCodec.MakeContext(codecSalt, key), entry.encryptedString);
                     }
                     catch (Exception e)
                     {
-                        Debug.LogError($"Failed to decode text for '{key}' in localization '{name}': {e.Message}");
+                        Debug.LogError($"Failed to decode text for '{key}' in localization '{name}': {e.Message} If codec settings changed, reimport the Yarn Project.");
                         return null;
                     }
                 }
@@ -141,7 +144,7 @@ namespace Yarn.Unity
             var entry = GetOrCreateEntry(key);
             if (stringTableCodec != null)
             {
-                entry.encryptedString = stringTableCodec.EncodeString(key, value);
+                entry.encryptedString = stringTableCodec.EncodeString(StringTableCodec.MakeContext(codecSalt, key), value);
                 entry.localizedString = null;
             }
             else

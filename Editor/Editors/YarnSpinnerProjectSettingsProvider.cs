@@ -51,6 +51,9 @@ namespace Yarn.Unity.Editor
                 var generateYSLS = unsavedSettings.generateYSLSFile;
                 var enableDirectLinkToVSCode = unsavedSettings.enableDirectLinkToVSCode;
                 var sortLocalisationValuesInsideStringTable = unsavedSettings.sortLocalisationValuesInsideStringTable;
+                var encryptByDefault = unsavedSettings.encryptByDefault;
+                var defaultCodecGuid = unsavedSettings.defaultCodecGuid;
+                var defaultSalt = unsavedSettings.defaultSalt;
 
                 using (new EditorGUI.IndentLevelScope())
                 {
@@ -78,6 +81,27 @@ namespace Yarn.Unity.Editor
                 }
 
                 EditorGUILayout.Space();
+                EditorGUILayout.LabelField("Dialogue encryption");
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    encryptByDefault = EditorGUILayout.Toggle(new GUIContent("Encrypt dialogue by default", "Yarn Projects set to 'Project Default' store their program and line text encoded with the codec below. Makes extracting dialogue from builds harder; can't stop someone who hooks the running game."), unsavedSettings.encryptByDefault);
+                    using (new EditorGUI.DisabledScope(!encryptByDefault))
+                    {
+                        var currentCodec = string.IsNullOrEmpty(unsavedSettings.defaultCodecGuid) ? null : AssetDatabase.LoadAssetAtPath<StringTableCodec>(AssetDatabase.GUIDToAssetPath(unsavedSettings.defaultCodecGuid));
+                        var newCodec = (StringTableCodec?)EditorGUILayout.ObjectField("Default codec", currentCodec, typeof(StringTableCodec), false);
+                        defaultCodecGuid = newCodec == null ? string.Empty : AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(newCodec));
+                        EditorGUILayout.BeginHorizontal();
+                        defaultSalt = EditorGUILayout.TextField("Default salt", unsavedSettings.defaultSalt);
+                        if (GUILayout.Button("Generate", GUILayout.Width(80))) { defaultSalt = System.Guid.NewGuid().ToString("N"); GUI.changed = true; }
+                        EditorGUILayout.EndHorizontal();
+                        if (encryptByDefault && newCodec == null)
+                        {
+                            EditorGUILayout.HelpBox("Choose a codec asset (create one from a StringTableCodec subclass); until then, nothing is encoded.", MessageType.Warning);
+                        }
+                    }
+                }
+
+                EditorGUILayout.Space();
                 EditorGUILayout.LabelField("Editor overrides");
                 using (new EditorGUI.IndentLevelScope())
                 {
@@ -94,6 +118,9 @@ namespace Yarn.Unity.Editor
                     unsavedSettings.generateYSLSFile = generateYSLS;
                     unsavedSettings.enableDirectLinkToVSCode = enableDirectLinkToVSCode;
                     unsavedSettings.sortLocalisationValuesInsideStringTable = sortLocalisationValuesInsideStringTable;
+                    unsavedSettings.encryptByDefault = encryptByDefault;
+                    unsavedSettings.defaultCodecGuid = defaultCodecGuid;
+                    unsavedSettings.defaultSalt = defaultSalt;
                 }
 
                 bool disabledReimportButton = true;
@@ -103,7 +130,10 @@ namespace Yarn.Unity.Editor
                     unsavedSettings.autoRefreshLocalisedAssets != baseSettings.autoRefreshLocalisedAssets ||
                     unsavedSettings.generateYSLSFile != baseSettings.generateYSLSFile ||
                     unsavedSettings.enableDirectLinkToVSCode != baseSettings.enableDirectLinkToVSCode ||
-                    unsavedSettings.sortLocalisationValuesInsideStringTable != baseSettings.sortLocalisationValuesInsideStringTable
+                    unsavedSettings.sortLocalisationValuesInsideStringTable != baseSettings.sortLocalisationValuesInsideStringTable ||
+                    unsavedSettings.encryptByDefault != baseSettings.encryptByDefault ||
+                    unsavedSettings.defaultCodecGuid != baseSettings.defaultCodecGuid ||
+                    unsavedSettings.defaultSalt != baseSettings.defaultSalt
                 )
                 {
                     disabledReimportButton = false;
@@ -137,6 +167,12 @@ namespace Yarn.Unity.Editor
                         {
                             needsYarnProjectReimport = true;
                         }
+                        if (baseSettings.encryptByDefault != unsavedSettings.encryptByDefault ||
+                            baseSettings.defaultCodecGuid != unsavedSettings.defaultCodecGuid ||
+                            baseSettings.defaultSalt != unsavedSettings.defaultSalt)
+                        {
+                            needsYarnProjectReimport = true;
+                        }
 
                         // saving the changed settings out to disk
                         baseSettings.autoRefreshLocalisedAssets = unsavedSettings.autoRefreshLocalisedAssets;
@@ -144,7 +180,11 @@ namespace Yarn.Unity.Editor
                         baseSettings.generateYSLSFile = unsavedSettings.generateYSLSFile;
                         baseSettings.enableDirectLinkToVSCode = unsavedSettings.enableDirectLinkToVSCode;
                         baseSettings.sortLocalisationValuesInsideStringTable = unsavedSettings.sortLocalisationValuesInsideStringTable;
+                        baseSettings.encryptByDefault = unsavedSettings.encryptByDefault;
+                        baseSettings.defaultCodecGuid = unsavedSettings.defaultCodecGuid;
+                        baseSettings.defaultSalt = unsavedSettings.defaultSalt;
                         baseSettings.WriteSettings();
+                        StringTableCodecDependency.Register();
 
                         // now we can reimport
                         if (needsCSharpRecompilation)

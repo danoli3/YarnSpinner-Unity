@@ -21,6 +21,10 @@ namespace Yarn.Unity
         [HideInInspector]
         public StringTableCodec? programCodec;
 
+        /// <summary>An optional, non-secret salt mixed into the codec context for this project's program and line text.</summary>
+        [HideInInspector]
+        public string? codecSalt;
+
         [HideInInspector]
         [NotNull]
 #pragma warning disable CS8618
@@ -208,7 +212,14 @@ namespace Yarn.Unity
                     var bytes = compiledYarnProgram;
                     if (programCodec != null && bytes != null)
                     {
-                        bytes = programCodec.Decode(StringTableCodec.ProgramContext, bytes);
+                        try
+                        {
+                            bytes = programCodec.Decode(StringTableCodec.MakeContext(codecSalt, StringTableCodec.ProgramContext), bytes);
+                        }
+                        catch (System.Security.Cryptography.CryptographicException e)
+                        {
+                            throw new System.Security.Cryptography.CryptographicException($"Couldn't decode Yarn Project '{name}': it was encoded with different codec settings than are in effect now. Reimport the Yarn Project (right-click > Reimport) after changing the codec. ({e.Message})", e);
+                        }
                     }
                     cachedProgram = Program.Parser.ParseFrom(bytes);
                 }

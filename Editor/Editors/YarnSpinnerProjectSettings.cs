@@ -47,6 +47,13 @@ namespace Yarn.Unity.Editor
         }
         public bool sortLocalisationValuesInsideStringTable = false;
 
+        /// <summary>Whether Yarn Projects set to "Project Default" encode their program and line text with <see cref="defaultCodecGuid"/>.</summary>
+        public bool encryptByDefault = false;
+        /// <summary>The GUID of the default <see cref="StringTableCodec"/> asset.</summary>
+        public string defaultCodecGuid = "";
+        /// <summary>The default (non-secret) salt mixed into codec contexts.</summary>
+        public string defaultSalt = "";
+
         private int majorVersion = 0;
         private int minorVersion = 0;
 
@@ -54,6 +61,9 @@ namespace Yarn.Unity.Editor
         private const string autoRefreshLocalisedAssetsKey = "autoRefreshLocalisedAssets";
         private const string generateYSLSFileKey = "generateYSLSFile";
         private const string enableDirectLinkToVSCodeKey = "enableDirectLinkToVSCode";
+        private const string encryptByDefaultKey = "encryptByDefault";
+        private const string defaultCodecGuidKey = "defaultCodecGuid";
+        private const string defaultSaltKey = "defaultSalt";
         private const string majorVersionKey = "majorVersion";
         private const string minorVersionKey = "minorVersion";
         private const string sortLocalisationValuesInsideStringTableKey = "sortLocalisationValuesInsideStringTable";
@@ -137,6 +147,9 @@ namespace Yarn.Unity.Editor
                 settings.majorVersion = major;
                 settings.minorVersion = minor;
                 settings.sortLocalisationValuesInsideStringTable = sortLocalisationValuesInsideStringTable;
+                settings.encryptByDefault = GetValueOrDefault(encryptByDefaultKey, false);
+                settings.defaultCodecGuid = GetValueOrDefault(defaultCodecGuidKey, "");
+                settings.defaultSalt = GetValueOrDefault(defaultSaltKey, "");
             }
             catch (System.Exception ex)
             {
@@ -162,6 +175,9 @@ namespace Yarn.Unity.Editor
             dictForm[generateYSLSFileKey] = this.generateYSLSFile;
             dictForm[enableDirectLinkToVSCodeKey] = this.enableDirectLinkToVSCode;
             dictForm[sortLocalisationValuesInsideStringTableKey] = this.sortLocalisationValuesInsideStringTable;
+            dictForm[encryptByDefaultKey] = this.encryptByDefault;
+            dictForm[defaultCodecGuidKey] = this.defaultCodecGuid;
+            dictForm[defaultSaltKey] = this.defaultSalt;
             dictForm[majorVersionKey] = this.majorVersion;
             dictForm[minorVersionKey] = this.minorVersion;
 

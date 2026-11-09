@@ -207,8 +207,51 @@ namespace Yarn.Unity.Editor
         /// to use Unity Localization.</remarks>
         public bool useAddressableAssets;
 
-        /// <summary>The GUID of the <see cref="StringTableCodec"/> used to encode this project's program and line text (empty for none).</summary>
+        /// <summary>Where this project's string encoding settings come from.</summary>
+        public enum CodecMode
+        {
+            /// <summary>Use the codec and salt from Project Settings (if encryption is enabled there).</summary>
+            ProjectDefault = 0,
+            /// <summary>Use <see cref="stringTableCodecGUID"/> and <see cref="codecSalt"/> from this importer.</summary>
+            Custom = 1,
+            /// <summary>Store the program and line text unencoded.</summary>
+            Off = 2,
+        }
+
+        /// <summary>Where this project gets its codec from.</summary>
+        public CodecMode codecMode = CodecMode.ProjectDefault;
+
+        /// <summary>The GUID of the custom <see cref="StringTableCodec"/> (used when <see cref="codecMode"/> is Custom).</summary>
         public string? stringTableCodecGUID;
+
+        /// <summary>The custom, non-secret salt (used when <see cref="codecMode"/> is Custom).</summary>
+        public string? codecSalt;
+
+        /// <summary>Works out the codec, salt and codec asset GUID in effect for this project, or a null codec if encoding is off.</summary>
+        internal (StringTableCodec? codec, string salt, string guid) ResolveCodec()
+        {
+            string guid;
+            string salt;
+            switch (codecMode)
+            {
+                case CodecMode.Off:
+                    return (null, string.Empty, string.Empty);
+                case CodecMode.Custom:
+                    guid = stringTableCodecGUID ?? string.Empty;
+                    salt = codecSalt ?? string.Empty;
+                    break;
+                default:
+                    var settings = YarnSpinnerProjectSettings.GetOrCreateSettings();
+                    if (!settings.encryptByDefault) { return (null, string.Empty, string.Empty); }
+                    guid = settings.defaultCodecGuid;
+                    salt = settings.defaultSalt;
+                    break;
+            }
+            if (string.IsNullOrEmpty(guid)) { return (null, salt, guid); }
+            var path = AssetDatabase.GUIDToAssetPath(guid);
+            var codec = string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<StringTableCodec>(path);
+            return (codec, salt, guid);
+        }
 
         /// <summary>Gets the <see cref="StringTableCodec"/> referenced by <see cref="stringTableCodecGUID"/>, if any.</summary>
         internal StringTableCodec? CodecAsset
@@ -384,19 +427,26 @@ namespace Yarn.Unity.Editor
             ctx.AddObjectToAsset("Project", projectAsset);
             ctx.SetMainObject(projectAsset);
 
-            var codec = CodecAsset;
-            if (!string.IsNullOrEmpty(stringTableCodecGUID))
+            // Re-import when the project-wide codec settings change, and when the codec asset in use changes.
+            ctx.DependsOnCustomDependency(StringTableCodecDependency.Name);
+            var (codec, codecSalt, codecGuid) = ResolveCodec();
+            if (!string.IsNullOrEmpty(codecGuid))
             {
                 if (codec == null)
                 {
-                    Debug.LogWarning($"{projectAsset.name}: the string table codec asset ({stringTableCodecGUID}) couldn't be loaded; content will not be encoded.");
+                    Debug.LogWarning($"{projectAsset.name}: the string table codec asset ({codecGuid}) couldn't be loaded; content will not be encoded.");
                 }
                 else
                 {
-                    ctx.DependsOnSourceAsset(AssetDatabase.GUIDToAssetPath(stringTableCodecGUID));
+                    ctx.DependsOnSourceAsset(AssetDatabase.GUIDToAssetPath(codecGuid));
                 }
             }
+            else if (codec == null && codecMode == CodecMode.Custom)
+            {
+                Debug.LogWarning($"{projectAsset.name}: the codec mode is Custom but no codec is assigned; content will not be encoded.");
+            }
             projectAsset.programCodec = codec;
+            projectAsset.codecSalt = codec != null ? codecSalt : string.Empty;
 
             var importData = ScriptableObject.CreateInstance<ProjectImportData>();
             importData.name = "Project Import Data";
@@ -713,7 +763,7 @@ namespace Yarn.Unity.Editor
                 }
 
                 projectAsset.compiledYarnProgram = codec != null
-                    ? codec.Encode(StringTableCodec.ProgramContext, compiledBytes)
+                    ? codec.Encode(StringTableCodec.MakeContext(projectAsset.codecSalt, StringTableCodec.ProgramContext), compiledBytes)
                     : compiledBytes;
 
                 if (generateVariablesSourceFile)
@@ -1165,6 +1215,7 @@ namespace Yarn.Unity.Editor
 
                 var newLocalization = ScriptableObject.CreateInstance<Localization>();
                 newLocalization.stringTableCodec = projectAsset.programCodec;
+                newLocalization.codecSalt = projectAsset.codecSalt;
 
                 if (stringTable != null)
                 {
@@ -1279,6 +1330,7 @@ namespace Yarn.Unity.Editor
                 var developmentLocalization = ScriptableObject.CreateInstance<Localization>();
                 developmentLocalization.name = $"Default ({importData.baseLanguageName})";
                 developmentLocalization.stringTableCodec = projectAsset.programCodec;
+                developmentLocalization.codecSalt = projectAsset.codecSalt;
 
 
                 // Add these new lines to the development localisation's asset

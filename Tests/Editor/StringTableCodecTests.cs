@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Yarn.Unity;
 
 #nullable enable
@@ -132,6 +133,35 @@ namespace Yarn.Unity.Tests
                 loc.AddLocalisedStringToAsset("line:1", "Plain");
                 loc.entries["line:1"].encryptedString = new byte[0];
                 Assert.AreEqual("Plain", loc.GetLocalizedString("line:1"));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(loc); }
+        }
+
+        [Test]
+        public void MakeContext_EmptySalt_LeavesContextUnchanged()
+        {
+            Assert.AreEqual("line:1", StringTableCodec.MakeContext(null, "line:1"));
+            Assert.AreEqual("line:1", StringTableCodec.MakeContext("", "line:1"));
+            Assert.AreEqual("salt|line:1", StringTableCodec.MakeContext("salt", "line:1"));
+        }
+
+        [Test]
+        public void Localization_WithSalt_DecodesOnlyWithSameSalt()
+        {
+            var loc = ScriptableObject.CreateInstance<Localization>();
+            try
+            {
+                loc.stringTableCodec = codec;
+                loc.codecSalt = "salt-a";
+                loc.AddLocalisedStringToAsset("line:1", "Salted text");
+                Assert.AreEqual("Salted text", loc.GetLocalizedString("line:1"));
+
+                loc.codecSalt = "salt-b";
+                LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("Failed to decode text for"));
+                Assert.IsNull(loc.GetLocalizedString("line:1"));
+
+                loc.codecSalt = "salt-a";
+                Assert.AreEqual("Salted text", loc.GetLocalizedString("line:1"));
             }
             finally { UnityEngine.Object.DestroyImmediate(loc); }
         }

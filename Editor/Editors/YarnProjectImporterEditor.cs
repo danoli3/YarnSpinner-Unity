@@ -46,6 +46,8 @@ namespace Yarn.Unity.Editor
 
         private SerializedProperty? useAddressableAssetsProperty;
         private SerializedProperty? stringTableCodecGUIDProperty;
+        private SerializedProperty? codecModeProperty;
+        private SerializedProperty? codecSaltProperty;
 
 
         public VisualTreeAsset? editorUI;
@@ -101,6 +103,8 @@ namespace Yarn.Unity.Editor
 
             useAddressableAssetsProperty = serializedObject.FindProperty(nameof(YarnProjectImporter.useAddressableAssets));
             stringTableCodecGUIDProperty = serializedObject.FindProperty(nameof(YarnProjectImporter.stringTableCodecGUID));
+            codecModeProperty = serializedObject.FindProperty(nameof(YarnProjectImporter.codecMode));
+            codecSaltProperty = serializedObject.FindProperty(nameof(YarnProjectImporter.codecSalt));
 
 #if USE_UNITY_LOCALIZATION
             useUnityLocalisationSystemProperty = serializedObject.FindProperty(nameof(YarnProjectImporter.UseUnityLocalisationSystem));
@@ -694,12 +698,12 @@ namespace Yarn.Unity.Editor
 
             ui.Add(variableStorageSettingsContainer);
 
+            // String encoding: "Project Default" (from Project Settings), "Custom" (set here) or "Off".
+            var codecModeField = new PropertyField(codecModeProperty, "String Encoding");
+            codecModeField.BindProperty(codecModeProperty);
+            var customCodecContainer = new VisualElement();
             // The codec is stored on the importer as a GUID, like the string table collection.
-            var codecField = new ObjectField("String Table Codec")
-            {
-                objectType = typeof(StringTableCodec),
-                tooltip = "If set, this project's compiled program and line text are stored encoded with this codec. This makes it harder to extract dialogue from built games, but can't stop someone who hooks the running game."
-            };
+            var codecField = new ObjectField("String Table Codec") { objectType = typeof(StringTableCodec) };
             codecField.SetValueWithoutNotify(yarnProjectImporter.CodecAsset);
             codecField.RegisterValueChangedCallback(e =>
             {
@@ -708,7 +712,26 @@ namespace Yarn.Unity.Editor
                 stringTableCodecGUIDProperty.stringValue = string.IsNullOrEmpty(path) ? string.Empty : AssetDatabase.AssetPathToGUID(path);
                 serializedObject.ApplyModifiedProperties();
             });
-            ui.Add(codecField);
+            var saltField = new PropertyField(codecSaltProperty, "Salt");
+            saltField.BindProperty(codecSaltProperty);
+            var generateSalt = new Button(() =>
+            {
+                codecSaltProperty!.stringValue = System.Guid.NewGuid().ToString("N");
+                serializedObject.ApplyModifiedProperties();
+            }) { text = "Generate Random Salt" };
+            customCodecContainer.Add(codecField);
+            customCodecContainer.Add(saltField);
+            customCodecContainer.Add(generateSalt);
+            var codecHelp = new IMGUIContainer(() => EditorGUILayout.HelpBox("Encodes this project's compiled program and line text in builds, making them harder to extract. It can't stop someone who hooks the running game. The project reimports when codec settings change; if you edit a codec asset, save it first.", MessageType.Info));
+            void UpdateCodecUI()
+            {
+                SetElementVisible(customCodecContainer, codecModeProperty?.enumValueIndex == (int)YarnProjectImporter.CodecMode.Custom);
+            }
+            UpdateCodecUI();
+            codecModeField.RegisterValueChangeCallback(e => UpdateCodecUI());
+            ui.Add(codecModeField);
+            ui.Add(customCodecContainer);
+            ui.Add(codecHelp);
 
 
             ui.Add(new IMGUIContainer(ApplyRevertGUI));
