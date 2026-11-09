@@ -17,6 +17,10 @@ namespace Yarn.Unity
         [HideInInspector]
         public byte[]? compiledYarnProgram;
 
+        /// <summary>If set, <see cref="compiledYarnProgram"/> is stored encoded with this codec and decoded when <see cref="Program"/> is first accessed.</summary>
+        [HideInInspector]
+        public StringTableCodec? programCodec;
+
         [HideInInspector]
         [NotNull]
 #pragma warning disable CS8618
@@ -201,7 +205,12 @@ namespace Yarn.Unity
             {
                 if (cachedProgram == null)
                 {
-                    cachedProgram = Program.Parser.ParseFrom(compiledYarnProgram);
+                    var bytes = compiledYarnProgram;
+                    if (programCodec != null && bytes != null)
+                    {
+                        bytes = programCodec.Decode(StringTableCodec.ProgramContext, bytes);
+                    }
+                    cachedProgram = Program.Parser.ParseFrom(bytes);
                 }
                 return cachedProgram;
             }
