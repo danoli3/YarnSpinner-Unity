@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added optional encoding of dialogue data in built games.
+  - A Yarn Project can now be given a `StringTableCodec` asset (Yarn Project importer Inspector → *String Table Codec*). When set, the compiled program and every line's text are stored encoded, and line text is decoded one line at a time on demand.
+  - Subclass `AesHmacStringTableCodec` and implement `GetMasterKey()` to get AES-256-CBC + HMAC-SHA256 with per-line derived keys, or implement `IStringTableCodec`/`StringTableCodec` for your own scheme. Don't store key material in serialized fields.
+  - This makes casual asset extraction harder; it can't stop someone who hooks the running game. It applies to the built-in localization system only (not Unity Localization), and source `.yarn` files and CSVs remain plaintext.
 - Added Rewired integration to Yarn Spinner+.
 - Added filtering in `[YarnNode]` dropdowns (thanks to  [Shane Marks](https://github.com/unknowndevice)!).
   - You can now limit which nodes appear in the Inspector by specifying a filter string in `YarnNode`-attributed strings.
